@@ -36,7 +36,7 @@ Imprime **exactamente** este bloque:
 ╠══════════════════════════════════════════════════════════════╣
 ║  [1] Ejecutar pipeline básico (TWX -> HTML)                 ║
 ║  [2] Ejecutar pipeline con auditoría (--audit-dir)          ║
-║  [3] Verificar entorno (OPENAI_API_KEY + dependencias)      ║
+║  [3] Verificar entorno (Python + dependencias)              ║
 ║  [4] Mostrar ayuda rápida de comandos                       ║
 ╚══════════════════════════════════════════════════════════════╝
 
@@ -81,9 +81,8 @@ Ejecuta en shell:
 
 ```bash
 cd tools/langgraph_twx_pipeline_20260703
-python3.10 --version
-python3.10 -c "import os; print('OPENAI_API_KEY=' + ('OK' if os.getenv('OPENAI_API_KEY') else 'MISSING'))"
-python3.10 -c "import langgraph, langchain_core, langchain_openai, networkx; print('deps=OK')"
+python --version
+python -c "import langgraph, networkx; print('deps=OK')"
 ```
 
 ### Opción 4 — Ayuda rápida
@@ -100,5 +99,5 @@ python3.10 main.py --help
 ## PASO 3 — Reportar resultado
 
 - Si se ejecuta pipeline: reporta la ruta del HTML generado.
-- Si falla: muestra error exacto y sugiere revisar `OPENAI_API_KEY` y `pip install -r requirements.txt`.
+- Si falla: muestra error exacto y sugiere `pip install -r requirements.txt`.
 

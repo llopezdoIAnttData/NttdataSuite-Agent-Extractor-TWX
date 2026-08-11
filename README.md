@@ -66,36 +66,35 @@ o:
 
 - Python 3.10+
 - pip
-- `OPENAI_API_KEY` en entorno para ejecutar el pipeline completo
+- No requiere `OPENAI_API_KEY`
 
 ## Comandos que ejecuta el menú
 
 ### Opción 1 — Pipeline básico
 
-```bash
-cd tools/langgraph_twx_pipeline_20260703
-python3.10 main.py --input "<RUTA_TWX>" --output "<RUTA_HTML>"
+```powershell
+Set-Location "C:\Users\jpervill\NttdataSuite-Agent-Extractor-TWX\tools\langgraph_twx_pipeline_20260703"
+python main.py --input "<RUTA_TWX>" --output "<RUTA_HTML>"
 ```
 
 ### Opción 2 — Pipeline con auditoría
 
-```bash
-cd tools/langgraph_twx_pipeline_20260703
-python3.10 main.py --input "<RUTA_TWX>" --output "<RUTA_HTML>" --audit-dir "<RUTA_AUDIT>" --extract-dir "<RUTA_EXTRACT_OPCIONAL>"
+```powershell
+Set-Location "C:\Users\jpervill\NttdataSuite-Agent-Extractor-TWX\tools\langgraph_twx_pipeline_20260703"
+python main.py --input "<RUTA_TWX>" --output "<RUTA_HTML>" --audit-dir "<RUTA_AUDIT>" --extract-dir "<RUTA_EXTRACT_OPCIONAL>"
 ```
 
 ### Opción 3 — Verificación de entorno
 
-```bash
-cd tools/langgraph_twx_pipeline_20260703
-python3.10 --version
-python3.10 -c "import os; print('OPENAI_API_KEY=' + ('OK' if os.getenv('OPENAI_API_KEY') else 'MISSING'))"
-python3.10 -c "import langgraph, langchain_core, langchain_openai, networkx; print('deps=OK')"
+```powershell
+Set-Location "C:\Users\jpervill\NttdataSuite-Agent-Extractor-TWX\tools\langgraph_twx_pipeline_20260703"
+python --version
+python -c "import langgraph, langchain_core, langchain_openai, networkx; print('deps=OK')"
 ```
 
 ### Opción 4 — Ayuda
 
-```bash
-cd tools/langgraph_twx_pipeline_20260703
-python3.10 main.py --help
+```powershell
+Set-Location "C:\Users\jpervill\NttdataSuite-Agent-Extractor-TWX\tools\langgraph_twx_pipeline_20260703"
+python main.py --help
 ```

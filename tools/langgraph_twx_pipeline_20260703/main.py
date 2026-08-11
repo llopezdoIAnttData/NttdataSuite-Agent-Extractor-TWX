@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from workflow import build_app
 
 
@@ -9,7 +8,7 @@ def parse_args():
     p = argparse.ArgumentParser(description="Pipeline LangGraph: TWX -> HTML funcional")
     p.add_argument("--input", required=True, help="Ruta del archivo .twx")
     p.add_argument("--output", required=True, help="Ruta del HTML de salida")
-    p.add_argument("--model", default="gpt-4o-mini", help="Modelo LLM para agentes")
+    p.add_argument("--model", default="local", help="Parámetro reservado (modo local)")
     p.add_argument("--audit-dir", default=None, help="Directorio para salidas de auditoria")
     p.add_argument("--extract-dir", default=None, help="Directorio opcional de extraccion")
     return p.parse_args()
@@ -17,8 +16,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError("Define OPENAI_API_KEY en tu entorno")
 
     app = build_app()
     result = app.invoke(

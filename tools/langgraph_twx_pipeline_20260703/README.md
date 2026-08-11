@@ -11,17 +11,11 @@ pip install -r requirements.txt
 ## Dependencias
 
 - langgraph
-- langchain-core
-- langchain-openai
 - networkx
 
-## Variable de entorno requerida
+## Variable de entorno
 
-Define `OPENAI_API_KEY` antes de ejecutar:
-
-```powershell
-$env:OPENAI_API_KEY="tu_api_key"
-```
+No requiere `OPENAI_API_KEY`. Ejecuta procesamiento local completo.
 
 ## Ejecución básica
 
@@ -61,15 +55,11 @@ python main.py `
    - Detección de `root_id`.
    - Registro de referencias no resueltas.
 
-3. **Traductor funcional (LLM, `agents.py`)**
-   - Convierte grafo técnico a JSON funcional consolidado.
-   - Limpia fences de respuesta y valida estructura mínima.
-   - Fallback local si falla.
+3. **Traductor funcional local (`agents.py`)**
+   - Convierte grafo técnico a JSON funcional consolidado con reglas locales.
 
-4. **Generador HTML (LLM, `agents.py`)**
-   - Genera HTML autocontenido.
-   - Limpia fences HTML.
-   - Fallback HTML auditable si falla.
+4. **Generador HTML local (`agents.py`)**
+   - Genera HTML autocontenido en modo local.
 
 5. **Persistencia y auditoría (`workflow.py`)**
    - Guarda HTML final.
@@ -96,7 +86,6 @@ python main.py `
 ## Limitaciones conocidas
 
 - La detección de relaciones depende de referencias presentes en XML; no interpreta toda semántica BPMN avanzada.
-- El mapeo funcional final depende del LLM; si la respuesta es inválida se usa fallback.
+- El mapeo funcional final usa reglas locales basadas en el grafo detectado.
 - Puede haber artefactos con IDs colisionados; se renombran y se agrega warning.
 - No ejecuta servicios IBM; solo analiza definición estática exportada.
-
