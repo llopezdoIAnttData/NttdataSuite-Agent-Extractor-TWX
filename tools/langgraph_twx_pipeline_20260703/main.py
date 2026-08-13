@@ -18,7 +18,7 @@ def parse_args():
 def main():
     args = parse_args()
     if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError("Define OPENAI_API_KEY en tu entorno")
+        print("Aviso: OPENAI_API_KEY no definida. Se ejecutara en modo fallback sin LLM.")
 
     app = build_app()
     result = app.invoke(

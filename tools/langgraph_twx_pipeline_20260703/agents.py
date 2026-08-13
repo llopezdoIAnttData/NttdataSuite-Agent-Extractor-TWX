@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from typing import Any, Dict
 from langchain_openai import ChatOpenAI
 from prompts import BUSINESS_TRANSLATOR_SYSTEM, HTML_GENERATOR_SYSTEM
 from html_fallback import render_html
+from local_agents import run_local_translation_agents
 
 
 def translate_business_model(state: Dict[str, Any]) -> Dict[str, Any]:
-    llm = ChatOpenAI(model=state.get("model", "gpt-4o-mini"), temperature=0.1)
+    if not os.getenv("OPENAI_API_KEY"):
+        local_model = run_local_translation_agents(state)
+        return {"functional_model": local_model}
+
     payload = {
         "process_name": state.get("manifest", {}).get("process_name") or "Proceso TWX",
         "nodes": state.get("graph_nodes", []),
@@ -21,6 +26,7 @@ def translate_business_model(state: Dict[str, Any]) -> Dict[str, Any]:
         + json.dumps(payload, ensure_ascii=False)
     )
     try:
+        llm = ChatOpenAI(model=state.get("model", "gpt-4o-mini"), temperature=0.1)
         response = llm.invoke(
             [
                 {"role": "system", "content": BUSINESS_TRANSLATOR_SYSTEM},
@@ -39,14 +45,17 @@ def translate_business_model(state: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def generate_html_agent(state: Dict[str, Any]) -> Dict[str, Any]:
-    llm = ChatOpenAI(model=state.get("model", "gpt-4o-mini"), temperature=0.1)
     functional_model = state.get("functional_model", {})
+    if not os.getenv("OPENAI_API_KEY"):
+        return {"html": render_html(functional_model, state)}
+
     prompt = (
         "Genera HTML completo autocontenido a partir del siguiente JSON. "
         "Devuelve SOLO HTML valido.\n\n"
         + json.dumps(functional_model, ensure_ascii=False)
     )
     try:
+        llm = ChatOpenAI(model=state.get("model", "gpt-4o-mini"), temperature=0.1)
         response = llm.invoke(
             [
                 {"role": "system", "content": HTML_GENERATOR_SYSTEM},

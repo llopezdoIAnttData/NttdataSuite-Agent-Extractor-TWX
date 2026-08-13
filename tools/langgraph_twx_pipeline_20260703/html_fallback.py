@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from typing import Any, Dict, List
 
 
@@ -8,51 +10,165 @@ def render_html(model: Dict[str, Any], state: Dict[str, Any] | None = None) -> s
     title = model.get("title", "Flujo cronologico funcional de subetapas")
     subtitle = model.get("subtitle", "Vista compacta para negocio")
     stages = model.get("stages", [])
-    warnings: List[str] = state.get("warnings", [])
-    root_id = state.get("root_id")
-    artifacts = state.get("artifacts", {})
-    nodes = state.get("graph_nodes", [])
-    edges = state.get("graph_edges", [])
 
     def esc(s: str) -> str:
         return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    toc = "\n".join(
-        f'<a href="#{esc(st.get("id","sx"))}">{i+1}) {esc(st.get("name","Subetapa"))}</a>'
-        for i, st in enumerate(stages)
-    )
-
-    cards: list[str] = []
+    stage_rows = []
     for st in stages:
-        routes = "".join(f"<li>{esc(r)}</li>" for r in st.get("routes", []))
-        groups_html = []
-        for g in st.get("groups", []):
+        name = str(st.get("name", "")).strip()
+        if not name:
+            continue
+        stage_rows.append(
+            {
+                "name": name,
+                "display_id": str(st.get("display_id", "N/A")),
+                "business_code": str(st.get("business_code", "")).strip(),
+                "routes": [str(r) for r in st.get("routes", [])],
+                "groups": st.get("groups", []) if isinstance(st.get("groups", []), list) else [],
+            }
+        )
+
+    def norm(s: str) -> str:
+        s = unicodedata.normalize("NFD", s.lower())
+        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+        return " ".join(s.split())
+
+    def is_noise(name: str) -> bool:
+        n = norm(name)
+        if re.fullmatch(r"[0-9a-f.\-]{8,}", n):
+            return True
+        if n in {"success", "error", "end", "finalizar", "test", "folio", "acciones", "sin titulo1", "untitled1"}:
+            return True
+        return len(n) < 4
+
+    def normalize_route(route: str) -> str:
+        r = route.strip()
+        if "->" not in r:
+            return r
+        left, right = r.split("->", 1)
+        target = right.strip()
+        if is_noise(target):
+            return left.strip()
+        return f"{left.strip()} -> {target}"
+
+    canonical = [
+        ("inco", "INCO", ["inco"]),
+        ("idc", "IDC", ["sp idc"]),
+        ("rev-idc", "Revision IDC", ["revision idc"]),
+        ("coin", "Coincidencia de Saldos", ["coincidencia de saldos"]),
+        ("rev-coin", "Revision Coincidencia de Saldos", ["revision saldos no coincidentes", "revision coincid"]),
+        ("matriz", "Matriz de Convivencia", ["matriz de conviv"]),
+        ("rev-matriz", "Revision Matriz de Convivencia", ["revision de matriz"]),
+        ("bono", "Bono de Pension", ["calcular bono de pension", "bono devengado y por devengar"]),
+        ("rev-udi", "Revision Valor UDI", ["revision udi", "valor udi"]),
+        ("gcc", "Generacion Cifras Control", ["generar cifras control", "cifras control bono devengado"]),
+        ("rev-gcc", "Revision Cifras Control", ["revision cifras control", "is revision cifras"]),
+        ("ar", "Archivo Respuesta", ["archivo respuesta op80", "archivo respuesta"]),
+        ("rev-ar", "Revision Archivo Respuesta", ["consulta archivo respuesta"]),
+        ("rev-ar-err", "Revision Archivo Respuesta Error", ["revision de errores archivo respuesta"]),
+        ("gen-mov", "Generacion de Movimientos", ["generacion de movimientos"]),
+        ("cmov", "Confirmacion de Movimientos", ["confirmacion de movimientos"]),
+        ("autoriza", "Autorizacion de Movimientos", ["autorizar movimientos"]),
+        ("acreditar", "Acreditar Movimientos", ["acreditar movimientos"]),
+        ("actualiza", "Actualizacion de Indicadores", ["actualizar indicadores"]),
+        ("desmarca", "Desmarca NCI / Desmarca de Cuentas", ["desmarca nci", "desmarcar cuentas"]),
+        ("intercambio", "Archivo de Intercambio / CNDTI", ["archivo de intercambio", "ctindi"]),
+        ("historico", "Resguardo Historico / Cifras Historico", ["cifras historico"]),
+        ("fin", "Fin", ["fin", "finalizar", "end"]),
+    ]
+
+    used = set()
+    sections = []
+
+    def find_match(patterns: List[str]) -> Dict[str, Any] | None:
+        for idx, st in enumerate(stage_rows):
+            if idx in used:
+                continue
+            n = norm(st["name"])
+            if any(p in n for p in patterns):
+                used.add(idx)
+                return st
+        return None
+
+    def find_unmatched_by_patterns(patterns: List[str]) -> Dict[str, Any] | None:
+        for idx, st in enumerate(stage_rows):
+            if idx in used:
+                continue
+            n = norm(st["name"])
+            if any(p in n for p in patterns):
+                used.add(idx)
+                return st
+        return None
+
+    for sec_id, sec_title, patterns in canonical:
+        st = find_match(patterns)
+        if not st and sec_id == "rev-idc":
+            st = find_unmatched_by_patterns(["idc"])
+        if not st and sec_id == "rev-udi":
+            st = find_unmatched_by_patterns(["inicio bono", "calcular bono"])
+        if not st and sec_id == "fin":
+            st = find_unmatched_by_patterns(["fin", "finalizar", "end"])
+
+        if not st:
+            sections.append(
+                {
+                    "id": sec_id,
+                    "title": sec_title,
+                    "label": sec_title,
+                    "routes": ["No detectada claramente en este TWX"],
+                    "groups": [],
+                }
+            )
+            continue
+        routes = [normalize_route(r) for r in st.get("routes", [])]
+        routes = [r for r in routes if r] or ["Sin transiciones relevantes detectadas"]
+        title_text = sec_title
+        code = st.get("business_code")
+        title_for_toc = title_text
+        if code:
+            title_text = f"{title_text} ({code})"
+        label = f"[{st.get('display_id', 'N/A')}] {st.get('name', sec_title)}"
+        sections.append(
+            {
+                "id": sec_id,
+                "title": title_for_toc,
+                "label": label,
+                "routes": routes[:8],
+                "groups": st.get("groups", [])[:6],
+            }
+        )
+
+    title = "Redencion Bono - Flujo cronologico funcional de subetapas (contexto Copilot)"
+    subtitle = "Vista compacta para negocio. Generado en modo agentes locales de Copilot (sin OPENAI_API_KEY)."
+    toc = "\n".join(f'<a href="#{esc(sec["id"])}">{esc(sec["title"])}</a>' for sec in sections)
+    cards = []
+    for sec in sections:
+        routes_html = "".join(f"<li>{esc(r)}</li>" for r in sec["routes"])
+        groups_html = ""
+        for g in sec.get("groups", []):
             gr = "".join(f"<li>{esc(r)}</li>" for r in g.get("routes", []))
-            note = f'<div class="group-note">{esc(g.get("note",""))}</div>' if g.get("note") else ""
-            groups_html.append(
-                f'<div class="group"><div class="group-title">{esc(g.get("title","Grupo"))}</div>{note}<ul>{gr}</ul></div>'
+            meta = f'<div class="route-meta">{esc(g.get("meta",""))}</div>' if g.get("meta") else ""
+            note = f'<div class="route-note">{esc(g.get("note",""))}</div>' if g.get("note") else ""
+            groups_html += (
+                '<div class="route-group">'
+                f'<div class="route-title">{esc(g.get("title","Grupo"))}</div>'
+                f"{meta}{note}"
+                f'<ul class="route-paths">{gr}</ul>'
+                "</div>"
             )
         cards.append(
             f"""
-            <div class="card" id="{esc(st.get('id','sx'))}">
-              <div class="title">Subetapa: [{esc(st.get('display_id','N/A'))}] {esc(st.get('name',''))}</div>
-              <span class="tag">{esc(st.get('tag','Contexto'))}</span>
-              <ul>{routes}</ul>
-              {''.join(groups_html)}
-            </div>
+            <section class="sec" id="{esc(sec["id"])}">
+              <h2>Subetapa: {esc(sec["label"])}</h2>
+              <div class="body">
+                <h3>UCA / Servicio</h3>
+                <ul>{routes_html}</ul>
+                {groups_html}
+              </div>
+            </section>
             """
         )
-
-    warnings_html = "".join(f"<li>{esc(w)}</li>" for w in warnings) if warnings else "<li>Sin warnings</li>"
-    artifact_rows = "".join(
-        f"<li><code>{esc(aid)}</code> - {esc(a.get('name',''))} ({esc(a.get('artifact_type','artifact'))}) - <span class='small'>{esc(a.get('source_file',''))}</span></li>"
-        for aid, a in list(artifacts.items())[:300]
-    ) or "<li>Sin artefactos</li>"
-    edge_rows = "".join(
-        f"<li><code>{esc(e.get('source',''))}</code> -> <code>{esc(e.get('target',''))}</code> | {esc(e.get('label',''))} | "
-        f"<span class='small'>evidence: {esc(str(e.get('evidence', {})))}</span></li>"
-        for e in edges[:500]
-    ) or "<li>Sin relaciones</li>"
 
     return f"""<!doctype html>
 <html lang="es">
@@ -61,50 +177,37 @@ def render_html(model: Dict[str, Any], state: Dict[str, Any] | None = None) -> s
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{esc(title)}</title>
   <style>
-    :root {{ --bg: #0d1117; --card: #161b22; --line: #30363d; --text: #e6edf3; --muted: #8b949e; --link: #58a6ff; --warn: #d29922; }}
+    :root{{--bg:#0d1117;--card:#161b22;--line:#30363d;--txt:#e6edf3;--muted:#8b949e;--acc:#58a6ff;}}
     *{{box-sizing:border-box}}
-    body{{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",Arial,sans-serif}}
-    .wrap{{max-width:1180px;margin:0 auto;padding:20px}}
-    h1{{margin:0 0 8px;font-size:28px}} .meta{{color:var(--muted);margin-bottom:14px}}
-    .card{{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}}
-    .toc{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px}}
-    .toc a{{display:block;text-decoration:none;color:var(--text);background:#111827;border:1px solid var(--line);padding:8px 10px;border-radius:8px}}
-    .title{{font-weight:700;color:#d2e6ff}}
-    .tag{{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:12px;margin:2px 6px 2px 0}}
-    ul{{margin:8px 0 0 18px}} li{{margin:4px 0}}
-    .group{{margin-top:10px;padding:10px;border:1px solid #3a3f4b;border-radius:8px;background:#111827}}
-    .group-title{{font-weight:700;color:#cdd9e5;margin-bottom:6px}}
-    .group-note{{font-size:12px;color:var(--muted);margin-bottom:6px}}
+    body{{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 "Segoe UI",Arial,sans-serif}}
+    header{{padding:18px 22px;background:#111827;border-bottom:1px solid var(--line)}}
+    h1{{margin:0 0 6px;font-size:22px;color:var(--acc)}}
+    .meta{{font-size:12px;color:var(--muted)}}
+    .wrap{{max-width:1220px;margin:0 auto;padding:18px}}
+    .toc{{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin-bottom:16px}}
+    .toc a{{display:block;text-decoration:none;color:#cfe8ff;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}}
+    .sec{{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px}}
+    .sec h2{{margin:0;padding:11px 13px;background:#1f2937;font-size:16px}}
+    .body{{padding:12px 13px}}
+    h3{{margin:10px 0 5px;font-size:13px;letter-spacing:.3px;text-transform:uppercase;color:#9fb7d6}}
+    ul{{margin:0;padding-left:18px}}
+    li{{margin:4px 0}}
+    .route-group{{margin-top:10px;padding:10px 12px;border:1px solid #3a4553;border-radius:8px;background:#111827}}
+    .route-title{{font-weight:700;color:#cfe8ff;margin-bottom:3px}}
+    .route-meta{{font-size:12px;color:#b8c7dc}}
+    .route-note{{margin-top:6px;font-size:12px;color:#ffd28a}}
+    .route-paths{{margin-top:6px;padding-left:18px}}
+    .route-paths li{{margin:4px 0}}
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <header>
     <h1>{esc(title)}</h1>
     <div class="meta">{esc(subtitle)}</div>
-    <div class="card">
-      <h2>Resumen de auditoria</h2>
-      <ul>
-        <li>Total artefactos: <code>{len(artifacts)}</code></li>
-        <li>Total nodos: <code>{len(nodes)}</code></li>
-        <li>Total relaciones: <code>{len(edges)}</code></li>
-        <li>root_id detectado: <code>{esc(str(root_id))}</code></li>
-      </ul>
-      <h3>Warnings</h3>
-      <ul>{warnings_html}</ul>
-    </div>
-    <div class="card">
-      <h2>Indice de subetapas</h2>
-      <div class="toc">{toc}</div>
-    </div>
+  </header>
+  <div class="wrap">
+    <nav class="toc">{toc}</nav>
     {''.join(cards)}
-    <div class="card">
-      <h2>Artefactos detectados</h2>
-      <ul>{artifact_rows}</ul>
-    </div>
-    <div class="card">
-      <h2>Relaciones detectadas (con evidencia)</h2>
-      <ul>{edge_rows}</ul>
-    </div>
   </div>
 </body>
 </html>"""
