@@ -4,10 +4,12 @@ Suite para analizar `.twx` de IBM BPM/BAW y generar HTML funcional con menú de 
 
 ## Instalación rápida (solo descargar y ejecutar)
 
+> Usa la **rama principal `main`** para obtener el menú actualizado con la opción **[3] Pipeline mejorado (agentes locales sin API)**.
+
 ### macOS / Linux
 
 ```bash
-git clone https://github.com/llopezdoIAnttData/NttdataSuite-Agent-Extractor-TWX.git
+git clone -b main https://github.com/llopezdoIAnttData/NttdataSuite-Agent-Extractor-TWX.git
 cd NttdataSuite-Agent-Extractor-TWX
 bash scripts/install_suite.sh
 ```
@@ -15,7 +17,7 @@ bash scripts/install_suite.sh
 ### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/llopezdoIAnttData/NttdataSuite-Agent-Extractor-TWX.git
+git clone --branch main https://github.com/llopezdoIAnttData/NttdataSuite-Agent-Extractor-TWX.git
 cd NttdataSuite-Agent-Extractor-TWX
 powershell -ExecutionPolicy Bypass -File .\scripts\install_suite.ps1
 ```
@@ -68,6 +70,16 @@ o:
 - pip
 - `OPENAI_API_KEY` en entorno para ejecutar el pipeline completo
 
+## Menú disponible
+
+Al ejecutar `/nttdat-extractor` o `/nttdata-extractor`, el menú muestra:
+
+1. Pipeline básico (TWX -> HTML)  
+2. Pipeline con auditoría  
+3. **Pipeline mejorado (agentes locales sin API)**  
+4. Verificar entorno  
+5. Ayuda rápida
+
 ## Comandos que ejecuta el menú
 
 ### Opción 1 — Pipeline básico
@@ -84,7 +96,14 @@ cd tools/langgraph_twx_pipeline_20260703
 python3.10 main.py --input "<RUTA_TWX>" --output "<RUTA_HTML>" --audit-dir "<RUTA_AUDIT>" --extract-dir "<RUTA_EXTRACT_OPCIONAL>"
 ```
 
-### Opción 3 — Verificación de entorno
+### Opción 3 — Pipeline mejorado (agentes locales sin API)
+
+```bash
+cd tools/langgraph_twx_pipeline_20260703
+python3.10 main.py --input "<RUTA_TWX>" --output "<RUTA_HTML>" --audit-dir "<RUTA_AUDIT>"
+```
+
+### Opción 4 — Verificación de entorno
 
 ```bash
 cd tools/langgraph_twx_pipeline_20260703
@@ -93,7 +112,7 @@ python3.10 -c "import os; print('OPENAI_API_KEY=' + ('OK' if os.getenv('OPENAI_A
 python3.10 -c "import langgraph, langchain_core, langchain_openai, networkx; print('deps=OK')"
 ```
 
-### Opción 4 — Ayuda
+### Opción 5 — Ayuda
 
 ```bash
 cd tools/langgraph_twx_pipeline_20260703
